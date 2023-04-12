@@ -1,6 +1,7 @@
 # CLIENT SIDE OF GRPC APPLICATION
 from __future__ import print_function
 import sys
+import Pyro4
 
 import grpc
 import app_pb2
@@ -102,49 +103,94 @@ def log_out(stub, username):
 
 # runs main control flow
 def run(server_addr):
-    with grpc.insecure_channel(server_addr + ":6000") as channel:
-        stub = app_pb2_grpc.AppStub(channel)
-        print("Welcome to the messaging center.\n")
+    uri = f"PYRO:Pyro.NameServer@{server_addr}:9090"
+    server = Pyro4.Proxy(uri)
+    print("Connected to server.")
+
+    try:
         # maintain username to essentially "sign in" the client to a username
-        username = set_username(stub)
+        username = set_username(server)
         # keep track of whether the user deletes the account or not so we don't
-        # try to log out ot deleted account
+        # try to log out of deleted account
         deleted = False
 
-        try:
-            # continuously ask for action denoted by user key stroke
-            while True:
-                print("l = List accounts")
-                print("s = Send message")
-                print("g = Get messages")
-                print("d = Delete account")
-                print("e = Exit")
-                action = input("Action: ")
+        # continuously ask for action denoted by user key stroke
+        while True:
+            print("l = List accounts")
+            print("s = Send message")
+            print("g = Get messages")
+            print("d = Delete account")
+            print("e = Exit")
+            action = input("Action: ")
 
-                if action.lower() == 'l':
-                    list_accounts(stub)
+            if action.lower() == 'l':
+                list_accounts(server)
+
+            if action.lower() == 's':
+                send_message(server, username)
+
+            if action.lower() == 'g':
+                get_messages(server, username)
+
+            if action.lower() == 'd':
+                delete_account(server, username)
+                deleted = True
+                break
+
+            if action.lower() == 'e':
+                break
+
+    except Pyro4.errors.CommunicationError:
+        print("Failed to connect to server.")
+        return
+
+    finally:
+        if not deleted:
+            log_out(server, username)
+# def run(server_addr):
+#     with grpc.insecure_channel(server_addr + ":6000") as channel:
+#         stub = app_pb2_grpc.AppStub(channel)
+#         print("Welcome to the messaging center.\n")
+#         # maintain username to essentially "sign in" the client to a username
+#         username = set_username(stub)
+#         # keep track of whether the user deletes the account or not so we don't
+#         # try to log out ot deleted account
+#         deleted = False
+
+#         try:
+#             # continuously ask for action denoted by user key stroke
+#             while True:
+#                 print("l = List accounts")
+#                 print("s = Send message")
+#                 print("g = Get messages")
+#                 print("d = Delete account")
+#                 print("e = Exit")
+#                 action = input("Action: ")
+
+#                 if action.lower() == 'l':
+#                     list_accounts(stub)
                 
-                if action.lower() == 's':
-                    send_message(stub, username)
+#                 if action.lower() == 's':
+#                     send_message(stub, username)
 
-                if action.lower() == 'g':
-                    get_messages(stub, username)
+#                 if action.lower() == 'g':
+#                     get_messages(stub, username)
 
-                if action.lower() == 'd':
-                    delete_account(stub, username)
-                    deleted = True
-                    break
+#                 if action.lower() == 'd':
+#                     delete_account(stub, username)
+#                     deleted = True
+#                     break
 
-                if action.lower() == 'e':
-                    break
+#                 if action.lower() == 'e':
+#                     break
         
-        # executes a log out when the user exits in correctly (pressing "e") or exits
-        # incorrectly by just cancelling the terminal. Ensures that one (and only one)
-        # terminal can always access the account. Also does not attempt to log out of the
-        # account if user has just deleted it with "d" command
-        finally:
-            if not deleted:
-                log_out(stub, username)
+#         # executes a log out when the user exits in correctly (pressing "e") or exits
+#         # incorrectly by just cancelling the terminal. Ensures that one (and only one)
+#         # terminal can always access the account. Also does not attempt to log out of the
+#         # account if user has just deleted it with "d" command
+#         finally:
+#             if not deleted:
+#                 log_out(stub, username)
 
 
 # take in server address as argument to run command, specified by user.

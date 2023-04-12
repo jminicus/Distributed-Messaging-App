@@ -3,6 +3,7 @@ import logging
 import sqlite3
 from concurrent import futures
 import socket
+import Pyro4
 
 import grpc
 import app_pb2
@@ -131,26 +132,51 @@ class AppServicer(app_pb2_grpc.AppServicer):
 
 # run server with 10 threads to handle multiple clients
 def serve():
+    # server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    # app_pb2_grpc.add_AppServicer_to_server(AppServicer(), server)
+
+    # # server = MyGRPCServer()
+
+    # # uri = daemon.register(server)
+
+    # # get ip address of current server and make sure server listens on port 6000
+    # ip_address = socket.gethostbyname(socket.gethostname())
+    # print("When running your client, specify " + ip_address + " as an argument to the terminal.")
+    # server.add_insecure_port(ip_address + ':6000')
+
+    # server.start()
+    # # uri = daemon.register(server)
+    # # daemon = Pyro4.Daemon()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     app_pb2_grpc.add_AppServicer_to_server(AppServicer(), server)
 
-    # get ip address of current server and make sure server listens on port 6000
-    ip_address = socket.gethostbyname(socket.gethostname())
-    print("When running your client, specify " + ip_address + " as an argument to the terminal.")
-    server.add_insecure_port(ip_address + ':6000')
+    # Register the server as a Pyro object
+    Pyro4.Daemon.serveSimple(
+        {
+            AppServicer: "AppService",
+        },
+        ns=True,
+    )
+    # server.wait_for_termination()
 
-    server.start()
-    server.wait_for_termination()
+    
 
 
 if __name__ == '__main__':
-    # setup conneciton to database
-    con = sqlite3.connect("store.db", check_same_thread=False)
-    cur = con.cursor()
+    # Define a list of Pyro servers
+    server_uris = ["PYRO:server1@localhost:9999", "PYRO:server2@localhost:9999", "PYRO:server3@localhost:9999"]
+    server_index = 0
 
-    logging.basicConfig()
-    serve()
+    while True:
+        try:
+            # Connect to the Pyro server
+            server_uri = server_uris[server_index]
+            server = Pyro4.Proxy(server_uri)
 
-    # close cursor and database connection
-    cur.close()
-    con.close()
+            # Start the gRPC server
+            serve()
+
+        except Pyro4.errors.CommunicationError:
+            # If there is a communication error with a Pyro server, switch to the next Pyro server
+            server_index = (server_index + 1) % len(server_uris)
+            continue
