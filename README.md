@@ -2,6 +2,16 @@
 
 Project done by John Minicus and Michael Sacco
 
+## Demo Day III
+
+## Addition of Persisting Database with SQLite3
+
+To have a database which persists between multiple runs of the server, we got rid of the internal dictionary structure for holding users/messages and migrated it over to a simple SQLite3 database. In this store, we have two tables -- one which holds usernames and the log-in indicator for each user, and one which holds the messages along with sender and recipient usernames. The only code we had to change to accomplish this was on the server side. First, in the main function, we establish a connection to the database and a cursor (essentially a pointer which can execute commands on the db). Then, simple SQL commands are used within each server-side function to appropriately manipulate the db. After each block of commands which writes, deletes, or updates the store, we commit the chnages using con.commit(). The result is a store which holds onto all related data even when the server stops/crashes.
+
+## Replication and Fault Tolerance
+
+To begin we attempted to replicate the backend of our gRPC implementation using PySyncObj, a Python library designed for replication between multiple servers. This utilizes the Raft Consensus Algorithm which is similar to Paxos in fault tolerance and performance. The implementation of the PySyncObj class created difficulties in our attempt to implement replication and fault tolerance with our pre-existing gRPC implementation, and we got to a point where we had just replicated the SQLite database and not the server instances themselves.  We then moved towards using Pyro4 to allow objects to talk to each other over the network in another attempt of implementing replication. This proved similarly difficult with gRPC. Finally, we attempted to use gRPC's subscription method to run a function in the case that a process was shutdown, but our attempt at this would not have worked over the network. Ultimately we were not able to implement the replication of our back end and a 2-fault tolerant system.
+
 ## Wire Protocol Configuration
 
 wp-implementation uses only the Python standard library
@@ -140,7 +150,3 @@ gRPC was great given the understandability of the clearly defined protocol for s
 Our WP was definitely quite rudimentary compared to gRPC but we can see the changes that could be made to the protocol to get closer to their specifications. An example of this would be sending a header with each message to give the types and sizes of the included data, and to know how many bytes should be received.
 
 Overall, we feel that working in each environment helped us understand the other to a much greater degree, and we look forward to potentially being able to use gRPC in future projects.
-
-## Addition of Persisting Database with SQLite3
-
-To have a database which persists between multiple runs of the server, we got rid of the internal dictionary structure for holding users/messages and migrated it over to a simple SQLite3 database. In this store, we have two tables -- one which holds usernames and the log-in indicator for each user, and one which holds the messages along with sender and recipient usernames. The only code we had to change to accomplish this was on the server side. First, in the main function, we establish a connection to the database and a cursor (essentially a pointer which can execute commands on the db). Then, simple SQL commands are used within each server-side function to appropriately manipulate the db. After each block of commands which writes, deletes, or updates the store, we commit the chnages using con.commit(). The result is a store which holds onto all related data even when the server stops/crashes.
